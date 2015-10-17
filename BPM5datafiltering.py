@@ -2,9 +2,10 @@ __author__ = 'emil'
 import requests
 import numpy as np
 from matplotlib import pyplot as plt
+from collections
 
 redownload_data = False
-
+t_range = (0, 20)
 data_url = "https://dl.dropboxusercontent.com/u/2640195/BPM5_data.txt"
 def url2mat(url):
     r = requests.get(url)
@@ -17,7 +18,13 @@ if redownload_data:
 else:
     raw_data = np.load('rawdat.npy')
 
+cropped_data = raw_data[t_range[0] <= raw_data[:, 0], :]
+cropped_data = cropped_data[t_range[1] >= cropped_data[:, 0], :]
 
-print(raw_data)
+def show_plots(data):
+    plt.plot(data[:, 0], data[:, 1], 'r')
+    plt.plot(data[:, 0], data[:, 2], 'g')
+    plt.show()
 
+show_plots(cropped_data)
 
