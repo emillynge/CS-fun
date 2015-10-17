@@ -2,7 +2,7 @@ __author__ = 'emil'
 import requests
 import numpy as np
 from matplotlib import pyplot as plt
-from collections
+from collections import  namedtuple
 
 redownload_data = False
 t_range = (0, 20)
