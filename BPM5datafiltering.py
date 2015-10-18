@@ -127,8 +127,8 @@ def fit(name, idx, color, *polylines):
     plt.plot(X_grid[1:], _dy_dx, color + '--', linewidth=1)
     return np.array(y_hat), np.array(dy_dx)
 
-fuel_y, fuel_diff =fit('fuel', 1, 'r')
-oxidizer_y, oxidizer_diff =fit('oxidizer', 2, 'g')
+fuel_y, fuel_diff =fit('fuel', 1, 'r', Polyline(2, 2), Polyline(2, 5), Polyline(2, 7), Polyline(2, 10), Polyline(2, 12))
+oxidizer_y, oxidizer_diff =fit('oxidizer', 2, 'g', Polyline(2, 2), Polyline(2, 5), Polyline(2, 7), Polyline(2, 10), Polyline(2, 12))
 
 OF = np.divide(oxidizer_diff, fuel_diff)
 
