@@ -2,7 +2,7 @@ __author__ = 'emil'
 import requests
 import numpy as np
 from matplotlib import pyplot as plt
-from collections import  namedtuple
+from collections import namedtuple
 from matplotlib import gridspec
 from scipy.optimize import curve_fit, fmin_tnc, check_grad, approx_fprime
 
