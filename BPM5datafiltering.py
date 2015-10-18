@@ -7,7 +7,6 @@ from matplotlib import gridspec
 from scipy.optimize import curve_fit, fmin_tnc, check_grad, approx_fprime
 
 redownload_data = False
-recomp_theta = False
 
 t_range = (0, 20)
 data_url = "https://dl.dropboxusercontent.com/u/2640195/BPM5_data.txt"
@@ -96,7 +95,7 @@ X_grid = np.linspace(t_range[0], t_range[1], 100)    # uniform x-grid to use for
 Polyline = namedtuple('PolyLine', 'order cutoff')
 
 
-def fit(name, idx, color, *polylines):
+def fit(name, idx, color, *polylines, recompute_theta=False):
     """
     Fit polyline segments to data in cropped_data[:, idx]. plot using color and name
     :param name: name of fit
@@ -109,7 +108,7 @@ def fit(name, idx, color, *polylines):
     # functions to be used for fitting
     theta0, optfun, _optfun = optfun_generator(cropped_data[:, idx], cropped_data[:, 0], *polylines)
 
-    if not recomp_theta:
+    if not recompute_theta:
         theta0 = np.load('theta{}.npy'.format(name))    # load previously saved theta parameters and use for fitting
     popt, *_ = fmin_tnc(_optfun, theta0, maxfun=10**4)
     np.save('theta{}.npy'.format(name), popt)
@@ -128,7 +127,8 @@ def fit(name, idx, color, *polylines):
     return np.array(y_hat), np.array(dy_dx)
 
 fuel_y, fuel_diff =fit('fuel', 1, 'r', Polyline(2, 2), Polyline(2, 5), Polyline(2, 7), Polyline(2, 10), Polyline(2, 12))
-oxidizer_y, oxidizer_diff =fit('oxidizer', 2, 'g', Polyline(2, 2), Polyline(2, 5), Polyline(2, 7), Polyline(2, 10), Polyline(2, 12))
+oxidizer_y, oxidizer_diff =fit('oxidizer', 2, 'g', Polyline(2, 1), Polyline(2, 1.5), Polyline(2, 2.8), Polyline(2, 5.5),
+                               Polyline(2, 12.5), Polyline(2, 13), recompute_theta=False)
 
 OF = np.divide(oxidizer_diff, fuel_diff)
 
