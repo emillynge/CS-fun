@@ -86,10 +86,11 @@ def optfun_generator(y, X, *poly_lines):
     theta0 = np.concatenate(tuple(theta0))      # collapse to a single numpy array
     return theta0, optfun, _optfun
 
-gs = gridspec.GridSpec(2, 2)                         # used for subplotting
-resolution = 10         # points per second
+gs = gridspec.GridSpec(2, 2)                    # used for subplotting
+resolution = 5                                  # points per second
 X_grid = np.linspace(t_range[0], t_range[1], (t_range[1]-t_range[0]) * resolution)    # uniform x-grid to use for interpolation
-
+main_legend = dict()
+main_ax = plt.subplot(gs[:,0])
 # declaration of PolyLine object to hold information:
 #   order - degree of polynomial for line segment
 #   cutoff - initial x-coordinate for when to activate line segment
@@ -106,7 +107,6 @@ def fit(name, idx, color, *polylines, recompute_theta=False):
     :param recompute_theta: bool - controls whether theta should be recomputed or loaded from file
     :return: None
     """
-
     # functions to be used for fitting
     theta0, optfun, _optfun = optfun_generator(cropped_data[:, idx], cropped_data[:, 0], *polylines)
 
@@ -122,9 +122,8 @@ def fit(name, idx, color, *polylines, recompute_theta=False):
 
     dy_dx = np.diff(np.max(y_hat) - y_hat)
     _dy_dx = np.array(dy_dx)
-    plt.subplot(gs[:,0])
-    plt.plot(cropped_data[:, 0], cropped_data[:, idx], color + 'o', ms=1)
-    plt.plot(X_grid, y_hat, color, linewidth=2)
+    main_ax.plot(cropped_data[:, 0], cropped_data[:, idx], color + 'o', ms=1)
+    main_legend[name] = main_ax.plot(X_grid, y_hat, color, linewidth=2, label=name)
     plt.ylabel('Remaining mass [kg]')
     plt.xlabel('time')
 
@@ -140,10 +139,22 @@ oxidizer_y, oxidizer_diff =fit('oxidizer', 2, 'g', Polyline(2, 1), Polyline(2, 1
 
 OF = np.divide(oxidizer_diff, fuel_diff)
 
+# Negative mass consumption is a measurement artifact and is therefore corrected to 0
+oxidizer_diff_neg_only = oxidizer_diff.copy()
+oxidizer_diff_neg_only[oxidizer_diff < 0] = 0
+fuel_diff_neg_only = fuel_diff.copy()
+fuel_diff_neg_only[fuel_diff < 0] = 0
+OF_corrected = np.divide(oxidizer_diff_neg_only, fuel_diff_neg_only)
+
 plt.subplot(2,2,4)
 plt.plot(X_grid[1:], OF, 'b')
+plt.plot(X_grid[1:], OF_corrected, 'm--', linewidth=3)
+plt.legend(('Raw', 'Corrected'))
 plt.ylabel('O/F ratio')
 plt.xlabel('time')
 plt.ylim([-1, 5])
 
+
+main_ax.legend()
+#main_ax.legend(main_legend.values(), main_legend.keys())
 plt.show()
