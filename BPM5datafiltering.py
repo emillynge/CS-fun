@@ -87,7 +87,8 @@ def optfun_generator(y, X, *poly_lines):
     return theta0, optfun, _optfun
 
 gs = gridspec.GridSpec(2, 2)                         # used for subplotting
-X_grid = np.linspace(t_range[0], t_range[1], 100)    # uniform x-grid to use for interpolation
+resolution = 10         # points per second
+X_grid = np.linspace(t_range[0], t_range[1], (t_range[1]-t_range[0]) * resolution)    # uniform x-grid to use for interpolation
 
 # declaration of PolyLine object to hold information:
 #   order - degree of polynomial for line segment
@@ -100,8 +101,9 @@ def fit(name, idx, color, *polylines, recompute_theta=False):
     Fit polyline segments to data in cropped_data[:, idx]. plot using color and name
     :param name: name of fit
     :param idx: index of data to be fitted
-    :param color:   color of fit
+    :param color: color of fit
     :param polylines: PolyLine objects
+    :param recompute_theta: bool - controls whether theta should be recomputed or loaded from file
     :return: None
     """
 
@@ -109,9 +111,10 @@ def fit(name, idx, color, *polylines, recompute_theta=False):
     theta0, optfun, _optfun = optfun_generator(cropped_data[:, idx], cropped_data[:, 0], *polylines)
 
     if not recompute_theta:
-        theta0 = np.load('theta{}.npy'.format(name))    # load previously saved theta parameters and use for fitting
-    popt, *_ = fmin_tnc(_optfun, theta0, maxfun=10**4)
-    np.save('theta{}.npy'.format(name), popt)
+        popt = np.load('theta{}.npy'.format(name))    # load previously saved theta parameters and use for fitting
+    else:
+        popt, *_ = fmin_tnc(_optfun, theta0, maxfun=10**4)
+        np.save('theta{}.npy'.format(name), popt)
 
     # functions to be used for interpolating onto X_grid
     _, optfun, _optfun = optfun_generator(X_grid, X_grid, *polylines)
@@ -122,8 +125,13 @@ def fit(name, idx, color, *polylines, recompute_theta=False):
     plt.subplot(gs[:,0])
     plt.plot(cropped_data[:, 0], cropped_data[:, idx], color + 'o', ms=1)
     plt.plot(X_grid, y_hat, color, linewidth=2)
+    plt.ylabel('Remaining mass [kg]')
+    plt.xlabel('time')
+
     plt.subplot(2,2,2)
-    plt.plot(X_grid[1:], _dy_dx, color + '--', linewidth=1)
+    plt.plot(X_grid[1:], _dy_dx * resolution, color + '--', linewidth=1)
+    plt.ylabel('Mass consumption [kg/s]')
+
     return np.array(y_hat), np.array(dy_dx)
 
 fuel_y, fuel_diff =fit('fuel', 1, 'r', Polyline(2, 2), Polyline(2, 5), Polyline(2, 7), Polyline(2, 10), Polyline(2, 12))
@@ -133,6 +141,9 @@ oxidizer_y, oxidizer_diff =fit('oxidizer', 2, 'g', Polyline(2, 1), Polyline(2, 1
 OF = np.divide(oxidizer_diff, fuel_diff)
 
 plt.subplot(2,2,4)
-plt.semilogy(X_grid[1:], OF, 'b')
+plt.plot(X_grid[1:], OF, 'b')
+plt.ylabel('O/F ratio')
+plt.xlabel('time')
+plt.ylim([-1, 5])
 
 plt.show()
