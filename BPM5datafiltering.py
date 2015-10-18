@@ -5,10 +5,10 @@ from matplotlib import pyplot as plt
 from collections import  namedtuple
 from matplotlib import gridspec
 from scipy.optimize import curve_fit, fmin_tnc, check_grad, approx_fprime
-np.random.seed(2)
 
 redownload_data = False
 recomp_theta = False
+
 t_range = (0, 20)
 data_url = "https://dl.dropboxusercontent.com/u/2640195/BPM5_data.txt"
 def url2mat(url):
@@ -22,24 +22,28 @@ if redownload_data:
 else:
     raw_data = np.load('rawdat.npy')
 
+# Remove data above and below t_range. Remove data points with NaN values
 cropped_data = raw_data[t_range[0] <= raw_data[:, 0], :]
 cropped_data = cropped_data[t_range[1] >= cropped_data[:, 0], :]
 no_nan = np.logical_not(np.logical_or(np.isnan(cropped_data[:, 1]), np.isnan(cropped_data[:, 2])))
-cropped_data = cropped_data[no_nan,:]
-
-def show_plots(data):
-    plt.plot(data[:, 0], data[:, 1], 'r')
-    plt.plot(data[:, 0], data[:, 2], 'g')
-    plt.show()
-
-#show_plots(cropped_data)
+cropped_data = cropped_data[no_nan, :]
 
 
-def optfun_generator(y, X, *poly_orders, cutoffs=None):
+def optfun_generator(y, X, *poly_lines):
+    """
+    Generate optimizing function
+    :param y: ground truth iterable
+    :param X: x-values corresponding to ground truth data points
+    :param poly_lines: instances of Polyline objects containing degree of polynomium and initial guess of cutoff
+    :return:
+        theta0: randomized initial parameters
+        optfun: optimizing function to be passed to minimizing function
+    """
+    poly_orders = tuple(line.order for line in poly_lines)
     n_params = sum(poly_orders) + 2 * len(poly_orders)
 
     def optfun(theta):
-        y_hat, dy_dx, x = np.zeros((1, len(X))), np.zeros((1, len(X))) , np.matrix(X).reshape((1, len(X)))
+        y_hat, dy_dx, x = np.zeros((1, len(X))), np.zeros((1, len(X))), np.matrix(X).reshape((1, len(X)))
         grad = list(range(n_params))
         i = 0
         for order in poly_orders:
@@ -66,35 +70,54 @@ def optfun_generator(y, X, *poly_orders, cutoffs=None):
         residual = y_hat - y
         grad = [np.sum(np.multiply(g, 2 * residual)) for g in grad]
         err = residual @ residual.T
-        return err[0,0], grad, y_hat.tolist()[0], dy_dx.tolist()[0]
+        return err[0,0], grad, y_hat.tolist()[0], dy_dx.tolist()[0] #TODO split function. it's doing way too many things!
 
     def _optfun(theta):
+        """
+        wrapper of optimizing function so it fits interface for minimizing functions
+        """
         return optfun(theta)[:2]
 
-    x0 = list()
-    for order,cutoff in zip(poly_orders, cutoffs):
-        x0.append(np.random.randn(order))
-        x0.append(np.ones((1,)))
-        x0.append(-np.ones((1,))*cutoff)
-    x0 = np.concatenate(tuple(x0))
-    return x0, optfun, _optfun
-gs = gridspec.GridSpec(2, 2)
-X_grid = np.linspace(0,20,100)
-fig= plt.gcf()
-def fit(name, idx, color):
-    no_nan_fuel = np.logical_not(np.isnan(cropped_data[:, idx]))
-    theta0, optfun, _optfun = optfun_generator(cropped_data[no_nan_fuel, idx], cropped_data[no_nan_fuel, 0], 2,2,2,2,2,
-                                               cutoffs=(5, 7, 9, 12,15))
+    # initialize weight vector theta
+    theta0 = list()
+    for order, cutoff in poly_lines:
+        theta0.append(np.random.randn(order))   # polynomial coefficients -> normal random numbers
+        theta0.append(np.ones((1,)))            # slope of cutoff -> 1
+        theta0.append(-np.ones((1,))*cutoff)    # cutoff parameter -> -1 * coordinate of desired cutoff
+    theta0 = np.concatenate(tuple(theta0))      # collapse to a single numpy array
+    return theta0, optfun, _optfun
+
+gs = gridspec.GridSpec(2, 2)                         # used for subplotting
+X_grid = np.linspace(t_range[0], t_range[1], 100)    # uniform x-grid to use for interpolation
+
+# declaration of PolyLine object to hold information:
+#   order - degree of polynomial for line segment
+#   cutoff - initial x-coordinate for when to activate line segment
+Polyline = namedtuple('PolyLine', 'order cutoff')
+
+
+def fit(name, idx, color, *polylines):
+    """
+    Fit polyline segments to data in cropped_data[:, idx]. plot using color and name
+    :param name: name of fit
+    :param idx: index of data to be fitted
+    :param color:   color of fit
+    :param polylines: PolyLine objects
+    :return: None
+    """
+
+    # functions to be used for fitting
+    theta0, optfun, _optfun = optfun_generator(cropped_data[:, idx], cropped_data[:, 0], *polylines)
 
     if not recomp_theta:
-        theta0 = np.load('theta{}.npy'.format(name))
+        theta0 = np.load('theta{}.npy'.format(name))    # load previously saved theta parameters and use for fitting
     popt, *_ = fmin_tnc(_optfun, theta0, maxfun=10**4)
     np.save('theta{}.npy'.format(name), popt)
 
-    _, optfun, _optfun = optfun_generator(X_grid, X_grid, 2,2,2,2,2,
-                                               cutoffs=(5, 7, 9, 12,15))
-
+    # functions to be used for interpolating onto X_grid
+    _, optfun, _optfun = optfun_generator(X_grid, X_grid, *polylines)
     _, __, y_hat, dy_dx = optfun(popt)
+
     dy_dx = np.diff(np.max(y_hat) - y_hat)
     _dy_dx = np.array(dy_dx)
     plt.subplot(gs[:,0])
